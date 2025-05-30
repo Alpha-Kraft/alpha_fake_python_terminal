@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.4] - 2025-05-31
+
+### Fixed
+- Fixed image display in README by using HTML for proper sizing on pub.dev
+- Removed unsupported Markdown image sizing syntax
+
 ## [0.1.3] - 2025-05-31
 
 ### Fixed

@@ -1,4 +1,6 @@
-![Alpha Fake Python Simulation Logo](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_terminal/master/assets/icon.png =200x)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_terminal/master/assets/icon.png" width="200" alt="Alpha Fake Python Simulation Logo">
+</p>
 
 # Alpha Fake Python Simulation
 
