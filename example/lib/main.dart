@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:alpha_fake_python_simulation/alpha_fake_python_simulation.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() {
   runApp(const MyApp());
@@ -23,15 +24,14 @@ class _MyAppState extends State<MyApp> {
 
     _terminalController = TerminalController(
       theme: const TerminalTheme(
-        // Customizing the theme for this example
-        backgroundColor: Color(0xFF1E1E2E), // A dark purple background
-        promptColor: Colors.amberAccent,
-        defaultTextColor: Colors.white70,
-        resultColor: Colors.lightBlueAccent,
-        errorColor: Colors.pinkAccent,
-        hintColor: Colors.greenAccent,
-        defaultFontSize: 15.0,
-        promptFontSize: 17.0,
+        backgroundColor: Colors.transparent,
+        promptColor: Color(0xFFBB86FC), // Purple accent
+        defaultTextColor: Color(0xFFE0E0E0),
+        resultColor: Color(0xFF03DAC6), // Teal accent
+        errorColor: Color(0xFFFF6E6E), // Soft red
+        hintColor: Color(0xFF4CAF50), // Green
+        defaultFontSize: 14.0,
+        promptFontSize: 16.0,
       ),
       customCommands: {
         'greet': _handleGreetCommand, // Register a custom 'greet' command
@@ -42,11 +42,20 @@ class _MyAppState extends State<MyApp> {
       },
     );
 
-    // You can also add initial output programmatically:
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _terminalController.addOutput('System boot initiated...', color: Colors.lightBlueAccent);
-      _terminalController.addOutput('Loading modules...', color: Colors.lightBlueAccent);
-      _terminalController.addOutput('Access granted. Type \'help\' for available commands.', color: Colors.greenAccent);
+    // Add initial output with styling
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _terminalController.addOutput(
+        '⚡ Welcome to Terminal Emulator v1.0.0',
+        color: _terminalController.theme.resultColor,
+      );
+      _terminalController.addOutput(
+        '🔍 Initializing system components...',
+        color: _terminalController.theme.hintColor,
+      );
+      _terminalController.addOutput(
+        '✅ System ready. Type \'help\' to see available commands.',
+        color: _terminalController.theme.hintColor,
+      );
     });
   }
 
@@ -112,12 +121,61 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'FakePyTerminal Demo',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primarySwatch: Colors.blue,
+      debugShowCheckedModeBanner: false, // Remove debug banner
+      theme: ThemeData.dark().copyWith(
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFFBB86FC),
+          secondary: Color(0xFF03DAC6),
+          surface: Color(0xFF1E1E2E),
+          background: Color(0xFF121212),
+        ),
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        textTheme: GoogleFonts.firaCodeTextTheme(
+          Theme.of(context).textTheme,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1E1E2E),
+          elevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: TerminalScreen(controller: _terminalController),
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Terminal Emulator'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.info_outline),
+              onPressed: () {
+                _terminalController.addOutput(
+                  'Terminal Emulator v1.0.0\nType \'help\' for available commands',
+                  color: _terminalController.theme.hintColor,
+                );
+              },
+            ),
+          ],
+        ),
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                const Color(0xFF1E1E2E).withOpacity(0.8),
+                const Color(0xFF121212),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: TerminalScreen(controller: _terminalController),
+          ),
+        ),
+      ),
     );
   }
 

@@ -1,7 +1,16 @@
 name: alpha_fake_python_simulation
 description: A Flutter package for creating a customizable fake Python terminal coding experience in a UI container.
-version: 0.1.0+1
-homepage: https://github.com/yourusername/alpha_fake_python_simulation
+version: 0.1.1+1
+homepage: https://github.com/Alpha-Kraft/alpha_fake_python_terminal
+repository: https://github.com/Alpha-Kraft/alpha_fake_python_terminal
+documentation: https://github.com/Alpha-Kraft/alpha_fake_python_terminal#readme
+
+topics:
+  - flutter
+  - dart
+  - terminal
+  - python
+  - simulation
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
