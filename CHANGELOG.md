@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3] - 2025-05-31
+
+### Fixed
+- Fixed demo video and image display issues on pub.dev by converting HTML to pure Markdown
+- Removed unsupported HTML tags from README.md for better compatibility with pub.dev
+- Ensured all image URLs use the correct GitHub repository path
+
 ## [0.1.2] - 2025-05-30
 
 ### Fixed
