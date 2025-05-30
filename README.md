@@ -1,14 +1,14 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_simulation/main/assets/icon.png" width="200" alt="Alpha Fake Python Simulation Logo">
+  <img src="https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_terminal/main/assets/icon.png" width="200" alt="Alpha Fake Python Simulation Logo">
   <h1>Alpha Fake Python Simulation</h1>
   <p>A Flutter package that provides a customizable, interactive terminal interface with Python-like syntax support.</p>
   
   ![Demo](https://img.shields.io/badge/Version-0.1.0-blue)
   ![License](https://img.shields.io/badge/License-MIT-green)
   
-  [![Demo: Help Command](https://img.shields.io/badge/Demo-Help_Command-FF6B6B?style=for-the-badge)](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_simulation/main/assets/help-command.gif)
-  [![Demo: Custom Command](https://img.shields.io/badge/Demo-Custom_Command-4CAF50?style=for-the-badge)](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_simulation/main/assets/custom-command.gif)
-  [![Demo: Clear Command](https://img.shields.io/badge/Demo-Clear_Command-2196F3?style=for-the-badge)](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_simulation/main/assets/clear.gif)
+  [![Demo: Help Command](https://img.shields.io/badge/Demo-Help_Command-FF6B6B?style=for-the-badge)](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_terminal/main/assets/help-command.gif)
+  [![Demo: Custom Command](https://img.shields.io/badge/Demo-Custom_Command-4CAF50?style=for-the-badge)](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_terminal/main/assets/custom-command.gif)
+  [![Demo: Clear Command](https://img.shields.io/badge/Demo-Clear_Command-2196F3?style=for-the-badge)](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_terminal/main/assets/clear.gif)
 </div>
 
 A Flutter package that provides a customizable, interactive terminal interface with Python-like syntax support. This package allows you to create an interactive coding environment within your Flutter app where users can execute Python-like commands and see the results in real-time.
@@ -131,13 +131,13 @@ Check out the `example` directory for a complete example app that demonstrates t
 ## Demo
 
 ### Built-in Help Command
-![Help Command Demo](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_simulation/main/assets/help-command.gif)
+![Help Command Demo](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_terminal/main/assets/help-command.gif)
 
 ### Custom Commands
-![Custom Command Demo](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_simulation/main/assets/custom-command.gif)
+![Custom Command Demo](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_terminal/main/assets/custom-command.gif)
 
 ### Clear Command
-![Clear Command Demo](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_simulation/main/assets/clear.gif)
+![Clear Command Demo](https://raw.githubusercontent.com/Alpha-Kraft/alpha_fake_python_terminal/main/assets/clear.gif)
 
 ## Contributing
 
@@ -154,4 +154,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-If you find this package useful, consider giving it a ⭐ on [GitHub](https://github.com/Alpha-Kraft/alpha_fake_python_simulation).
+If you find this package useful, consider giving it a ⭐ on [GitHub](https://github.com/Alpha-Kraft/alpha_fake_python_terminal).

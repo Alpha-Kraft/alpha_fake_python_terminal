@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.2] - 2025-05-30
+
+### Fixed
+- Fixed all GitHub repository links in README.md to point to the correct repository name 'alpha_fake_python_terminal'
+- Updated image and demo GIF URLs to use the correct repository path
+
 ## [0.1.1] - 2025-05-30
 
 ### Fixed
