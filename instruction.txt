@@ -1,0 +1,1130 @@
+Okay, this is an excellent, challenging, and super practical request! Building a Flutter package for a customizable, fake terminal UI is significantly more involved than a single Dart file, as it requires proper architecture, state management, and user-facing APIs.
+
+We'll structure it like a standard Flutter package:
+
+alpha_fake_python_simulation/
+├── lib/
+│   ├── alpha_fake_python_simulation.dart    <-- Main package export
+│   └── src/                                 <-- Internal implementations
+│       ├── fake_python_interpreter.dart     <-- Python parsing logic
+│       ├── models.dart                      <-- Data models (TerminalLine, TerminalTheme)
+│       └── terminal_controller.dart         <-- State management and core logic
+│       └── terminal_screen.dart             <-- UI widget
+├── example/                                 <-- Demonstrates package usage
+│   └── lib/
+│       └── main.dart
+├── pubspec.yaml                             <-- Package metadata
+├── README.md                                <-- Documentation for users
+└── CHANGELOG.md                             <-- Release history
+
+1. Project Setup (Initial Creation)
+
+First, create the package:
+
+flutter create --template=package alpha_fake_python_simulation
+cd alpha_fake_python_simulation
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Bash
+IGNORE_WHEN_COPYING_END
+
+Now, we'll populate the files.
+
+2. Package Source Files (lib/src/)
+
+a) lib/src/models.dart
+
+// lib/src/models.dart
+
+import 'package:flutter/material.dart';
+
+/// Represents a single line of output in the terminal, with styling.
+class TerminalLine {
+  final String text;
+  final Color color;
+
+  TerminalLine({required this.text, required this.color});
+
+  @override
+  String toString() => 'TerminalLine(text: "$text", color: $color)';
+}
+
+/// A flexible definition for a custom terminal command handler.
+/// [command] is the full command string entered by the user.
+/// [args] are the arguments following the command name (empty if none).
+/// [controller] is the TerminalController instance, allowing the handler
+///              to interact with the terminal (e.g., print output, manipulate scope).
+typedef TerminalCommandHandler = Future<void> Function(
+  String command,
+  List<String> args,
+  TerminalController controller,
+);
+
+/// Configuration for the terminal's visual appearance.
+class TerminalTheme {
+  final Color backgroundColor;
+  final Color promptColor;
+  final Color defaultTextColor;
+  final Color resultColor; // For Python-like expression results
+  final Color errorColor;
+  final Color hintColor;
+  final double defaultFontSize;
+  final double promptFontSize;
+
+  const TerminalTheme({
+    this.backgroundColor = Colors.black,
+    this.promptColor = Colors.lightGreenAccent,
+    this.defaultTextColor = Colors.white,
+    this.resultColor = Colors.blueAccent,
+    this.errorColor = Colors.redAccent,
+    this.hintColor = Colors.grey,
+    this.defaultFontSize = 14.0,
+    this.promptFontSize = 16.0,
+  });
+
+  /// Provides a default dark theme for convenience.
+  static const TerminalTheme defaultDark = TerminalTheme();
+}
+
+// Forward declaration for TerminalController to resolve circular dependency
+// Will be imported by TerminalScreen and FakePythonInterpreter
+class TerminalController extends ChangeNotifier {
+  // This class's implementation will be in terminal_controller.dart
+}
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Dart
+IGNORE_WHEN_COPYING_END
+
+b) lib/src/fake_python_interpreter.dart
+
+// lib/src/fake_python_interpreter.dart
+
+import 'dart:math';
+import 'package:flutter/material.dart'; // Only for Color objects used in printToTerminal
+import 'package:alpha_fake_python_simulation/src/models.dart';
+import 'package:alpha_fake_python_simulation/src/terminal_controller.dart'; // For TerminalController instance
+
+/// A simplified class to "interpret" Python-like commands.
+/// It interacts with the TerminalController for scope and output.
+class FakePythonInterpreter {
+  final TerminalController _controller;
+  final Random _random = Random();
+
+  FakePythonInterpreter(this._controller);
+
+  /// Attempts to process the given input as a Python-like command.
+  /// Returns true if the command was recognized and handled, false otherwise.
+  bool processPythonLikeInput(String input) {
+    // Note: Order of checks matters here (e.g., assignment before expression evaluation)
+
+    // 1. Variable Assignment (e.g., x = 10, name = "Alice", my_list = [1, 2, 3])
+    RegExp assignRegex = RegExp(r'^(\w+)\s*=\s*(.+)$');
+    if (assignRegex.hasMatch(input)) {
+      Match match = assignRegex.firstMatch(input)!;
+      String varName = match.group(1)!;
+      String valueStr = match.group(2)!.trim();
+
+      dynamic value;
+      // Handle different literal types and variable assignment
+      if (valueStr.startsWith('"') && valueStr.endsWith('"')) {
+        value = valueStr.substring(1, valueStr.length - 1);
+      } else if (valueStr.startsWith("'") && valueStr.endsWith("'")) {
+        value = valueStr.substring(1, valueStr.length - 1);
+      } else if (int.tryParse(valueStr) != null) {
+        value = int.parse(valueStr);
+      } else if (double.tryParse(valueStr) != null) {
+        value = double.parse(valueStr);
+      } else if (_controller.pythonScope.containsKey(valueStr)) {
+        value = _controller.pythonScope[valueStr]; // Assigning value from another variable
+      } else if (valueStr == 'True') {
+        value = true;
+      } else if (valueStr == 'False') {
+        value = false;
+      } else if (valueStr.startsWith('[') && valueStr.endsWith(']')) {
+        // Basic list literal support
+        String content = valueStr.substring(1, valueStr.length - 1).trim();
+        value = content.split(',').map((e) => e.trim()).toList();
+      } else {
+        _controller.addOutput(
+          'Error: Cannot assign "${valueStr}" to variable "${varName}". Unsupported type or syntax.',
+          color: _controller.theme.errorColor,
+        );
+        return true; // Handled as an error
+      }
+      _controller.pythonScope[varName] = value;
+      _controller.addOutput(
+        'Variable "$varName" assigned to: ${value.toString()}',
+        color: _controller.theme.resultColor,
+      );
+      return true;
+    }
+
+    // 2. print() statement (e.g., print("hello"), print(x), print(x + 5))
+    RegExp printRegex = RegExp(r'^print\s*\((.*)\)$');
+    if (printRegex.hasMatch(input)) {
+      String content = printRegex.firstMatch(input)!.group(1)!.trim();
+      List<String> itemsToPrint = content.split(',').map((s) => s.trim()).toList();
+      String output = '';
+
+      for (String item in itemsToPrint) {
+        dynamic evaluatedValue = _evaluateExpression(item);
+        if (evaluatedValue == null) {
+          _controller.addOutput(
+            "NameError: name '$item' is not defined",
+            color: _controller.theme.errorColor,
+          );
+          return true; // Handled as an error
+        } else if (evaluatedValue is String && evaluatedValue.startsWith("Error:")) {
+          // Propagate explicit error messages from _evaluateExpression.
+          _controller.addOutput(evaluatedValue.substring("Error: ".length), // Remove prefix for cleaner output
+            color: _controller.theme.errorColor,
+          );
+          return true; // Handled as an error
+        } else {
+          output += evaluatedValue.toString() + ' ';
+        }
+      }
+      _controller.addOutput(output.trim(), color: _controller.theme.defaultTextColor);
+      return true;
+    }
+
+    // 3. len() function simulation (e.g., len("hello"), len(my_list))
+    RegExp lenRegex = RegExp(r'^len\s*\((.*)\)$');
+    if (lenRegex.hasMatch(input)) {
+      String target = lenRegex.firstMatch(input)!.group(1)!.trim();
+      dynamic evaluatedTarget = _evaluateExpression(target); // Evaluate argument if it's a variable or literal.
+      if (evaluatedTarget is String) {
+        _controller.addOutput(evaluatedTarget.length.toString(), color: _controller.theme.resultColor);
+      } else if (evaluatedTarget is List) {
+        _controller.addOutput(evaluatedTarget.length.toString(), color: _controller.theme.resultColor);
+      } else if (evaluatedTarget == null) {
+        _controller.addOutput(
+          'NameError: name "$target" is not defined',
+          color: _controller.theme.errorColor,
+        );
+      } else {
+        _controller.addOutput(
+          'TypeError: object of type "${_getPythonTypeName(evaluatedTarget)}" has no len()',
+          color: _controller.theme.errorColor,
+        );
+      }
+      return true;
+    }
+
+    // 4. random.randint(a, b) simulation
+    RegExp randomIntRegex = RegExp(r'^random\.randint\s*\((\d+)\s*,\s*(\d+)\)$');
+    if (randomIntRegex.hasMatch(input)) {
+      Match? match = randomIntRegex.firstMatch(input);
+      if (match != null && match.groupCount == 2) {
+        int? min = int.tryParse(match.group(1)!);
+        int? max = int.tryParse(match.group(2)!);
+        if (min != null && max != null) {
+          if (min > max) {
+            _controller.addOutput(
+              'ValueError: empty range for randint(${min}, ${max})',
+              color: _controller.theme.errorColor,
+            );
+          } else {
+            int randomNumber = min + _random.nextInt(max - min + 1);
+            _controller.addOutput(randomNumber.toString(), color: _controller.theme.resultColor);
+          }
+          return true;
+        }
+      }
+    }
+
+    // 5. Direct expression evaluation (e.g., `2 + 3`, `x * 5`, `my_variable`)
+    // Try to evaluate the entire input as an expression.
+    dynamic result = _evaluateExpression(input);
+    if (result != null) {
+      if (result is String && result.startsWith("Error:")) {
+        _controller.addOutput(result.substring("Error: ".length), // Remove prefix
+          color: _controller.theme.errorColor,
+        );
+      } else if (result.toString().isNotEmpty) {
+        _controller.addOutput(result.toString(), color: _controller.theme.resultColor);
+      }
+      return true; // Handled the expression
+    }
+
+    // If none of the above patterns matched, it's an unrecognized Python-like command.
+    return false;
+  }
+
+  /// Evaluates a simple expression string (literal, variable, or single arithmetic op).
+  /// Returns the evaluated value, or null if it cannot be evaluated.
+  /// Returns an error string (starting with "Error:") for type errors/division by zero.
+  dynamic _evaluateExpression(String expr) {
+    expr = expr.trim();
+
+    // 1. String literals
+    if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
+      return expr.substring(1, expr.length - 1);
+    }
+
+    // 2. Numeric literals
+    if (int.tryParse(expr) != null) {
+      return int.parse(expr);
+    }
+    if (double.tryParse(expr) != null) {
+      return double.parse(expr);
+    }
+
+    // 3. Boolean literals
+    if (expr == 'True') return true;
+    if (expr == 'False') return false;
+
+    // 4. Variable lookup
+    if (_controller.pythonScope.containsKey(expr)) {
+      return _controller.pythonScope[expr];
+    }
+
+    // 5. Basic arithmetic (highly simplified: no order of operations, one op only)
+    List<String> parts;
+    String op = '';
+
+    if (expr.contains('+')) {
+      parts = expr.split('+');
+      op = '+';
+    } else if (expr.contains('-')) {
+      parts = expr.split('-');
+      op = '-';
+    } else if (expr.contains('*')) {
+      parts = expr.split('*');
+      op = '*';
+    } else if (expr.contains('/')) {
+      parts = expr.split('/');
+      op = '/';
+    } else {
+      return null; // Not a known literal, variable, or simple operation
+    }
+
+    if (parts.length == 2) {
+      dynamic val1 = _evaluateOperand(parts[0].trim());
+      dynamic val2 = _evaluateOperand(parts[1].trim());
+
+      // Type checking and operation based on Python's behavior
+      if (val1 is num && val2 is num) {
+        switch (op) {
+          case '+':
+            return val1 + val2;
+          case '-':
+            return val1 - val2;
+          case '*':
+            return val1 * val2;
+          case '/':
+            if (val2 == 0) {
+              return "Error: ZeroDivisionError: division by zero";
+            }
+            return val1 / val2; // Python's division is float division
+        }
+      } else if (val1 is String && op == '+') {
+        // String concatenation with string or num (Python converts num to string)
+        return val1 + (val2?.toString() ?? 'null'); // handle potential null from _evaluateOperand
+      }
+      return "Error: TypeError: unsupported operand type(s) for $op: '${_getPythonTypeName(val1)}' and '${_getPythonTypeName(val2)}'";
+    }
+
+    return null; // Fallback if expression couldn't be evaluated successfully
+  }
+
+  /// Helper to evaluate an individual operand within a larger expression.
+  dynamic _evaluateOperand(String operand) {
+    if ((operand.startsWith('"') && operand.endsWith('"')) || (operand.startsWith("'") && operand.endsWith("'"))) {
+      return operand.substring(1, operand.length - 1);
+    }
+    if (int.tryParse(operand) != null) {
+      return int.parse(operand);
+    }
+    if (double.tryParse(operand) != null) {
+      return double.parse(operand);
+    }
+    if (operand == 'True') return true;
+    if (operand == 'False') return false;
+
+    if (_controller.pythonScope.containsKey(operand)) {
+      return _controller.pythonScope[operand];
+    }
+    return null; // Not a simple literal or known variable
+  }
+
+  /// Returns a string representation of the "Python type" for a given Dart value.
+  String _getPythonTypeName(dynamic value) {
+    if (value == null) return 'NoneType';
+    if (value is int) return 'int';
+    if (value is double) return 'float';
+    if (value is String) return 'str';
+    if (value is List) return 'list';
+    if (value is Map) return 'dict';
+    if (value is bool) return 'bool';
+    return value.runtimeType.toString().toLowerCase(); // Fallback for Dart types
+  }
+}
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Dart
+IGNORE_WHEN_COPYING_END
+
+c) lib/src/terminal_controller.dart
+
+// lib/src/terminal_controller.dart
+
+import 'package:flutter/material.dart';
+import 'package:alpha_fake_python_simulation/src/models.dart';
+import 'package:alpha_fake_python_simulation/src/fake_python_interpreter.dart';
+
+/// Manages the state and logic for the fake terminal.
+///
+/// It holds the terminal history, the simulated Python scope, and processes commands.
+/// This controller is a [ChangeNotifier] so that the [TerminalScreen] (and any
+/// other UI parts interested in the terminal state) can listen for updates.
+class TerminalController extends ChangeNotifier {
+  final List<TerminalLine> _history = [];
+  final Map<String, dynamic> _pythonScope = {};
+  final Map<String, TerminalCommandHandler> _customCommands = {};
+
+  late final FakePythonInterpreter _pythonInterpreter;
+  late final ScrollController _scrollController;
+
+  /// The theme currently applied to the terminal.
+  final TerminalTheme theme;
+
+  /// Creates a [TerminalController].
+  ///
+  /// [theme]: The visual theme to apply to the terminal.
+  /// [customCommands]: A map of command names to [TerminalCommandHandler] functions
+  ///   for extending the terminal's capabilities.
+  TerminalController({
+    this.theme = TerminalTheme.defaultDark,
+    Map<String, TerminalCommandHandler>? customCommands,
+  }) {
+    _pythonInterpreter = FakePythonInterpreter(this);
+    _scrollController = ScrollController();
+    if (customCommands != null) {
+      _customCommands.addAll(customCommands);
+    }
+  }
+
+  /// Returns an unmodifiable list of the terminal's history.
+  List<TerminalLine> get history => List.unmodifiable(_history);
+
+  /// Returns an unmodifiable map of the simulated Python scope variables.
+  Map<String, dynamic> get pythonScope => Map.unmodifiable(_pythonScope);
+
+  /// Provides access to the internal ScrollController for programmatic scrolling.
+  ScrollController get scrollController => _scrollController;
+
+  /// Initializes the terminal, typically by printing a welcome message.
+  void init() {
+    addOutput("===================================", color: theme.promptColor);
+    addOutput("||  Welcome to FakePyTerminal!   ||", color: theme.promptColor);
+    addOutput("||  (A Dart simulation of Python)||", color: theme.promptColor);
+    addOutput("===================================", color: theme.promptColor);
+    addOutput("");
+    addOutput("Type 'help' for commands, 'exit' to quit.", color: theme.defaultTextColor);
+    addOutput("");
+    notifyListeners(); // Notify listeners after initial setup
+  }
+
+  /// Adds a new line of text to the terminal history.
+  /// [message]: The text content of the line.
+  /// [color]: The color of the text. Defaults to the theme's [defaultTextColor].
+  /// [scroll]: Whether to auto-scroll to the bottom after adding the line.
+  void addOutput(String message, {Color? color, bool scroll = true}) {
+    _history.add(TerminalLine(text: message, color: color ?? theme.defaultTextColor));
+    // Keep history from growing indefinitely
+    if (_history.length > 500) { // Limit to 500 lines
+      _history.removeRange(0, _history.length - 500);
+    }
+    notifyListeners();
+    if (scroll) {
+      _scrollToBottom();
+    }
+  }
+
+  /// Processes a command string entered by the user.
+  ///
+  /// This method checks for built-in commands, then custom commands, and
+  /// finally attempts to interpret it as a Python-like command.
+  Future<void> executeCommand(String input) async {
+    final trimmedInput = input.trim();
+    if (trimmedInput.isEmpty) return;
+
+    addOutput('>>> $trimmedInput', color: theme.promptColor);
+
+    final parts = trimmedInput.split(' ');
+    final commandName = parts[0];
+    final args = parts.skip(1).toList();
+
+    switch (commandName.toLowerCase()) {
+      case 'exit':
+        addOutput("Goodbye!", color: theme.promptColor);
+        // In a real app, this might trigger app closing or navigating away
+        // For a package, we just output the message.
+        break;
+      case 'clear':
+        _history.clear();
+        addOutput('Terminal cleared.', color: theme.defaultTextColor);
+        notifyListeners();
+        break;
+      case 'help':
+        _printHelp();
+        break;
+      default:
+        // Try custom commands first
+        if (_customCommands.containsKey(commandName)) {
+          try {
+            await _customCommands[commandName]!(trimmedInput, args, this);
+          } catch (e, st) {
+            addOutput('Error executing custom command "$commandName": $e', color: theme.errorColor);
+            addOutput('Stack trace: $st', color: theme.hintColor);
+          }
+        }
+        // Then try Python-like commands
+        else if (!_pythonInterpreter.processPythonLikeInput(trimmedInput)) {
+          addOutput('SyntaxError: Invalid or unsupported command: "$trimmedInput"', color: theme.errorColor);
+          addOutput('Note: This fake terminal has limited capabilities.', color: theme.hintColor);
+        }
+        break;
+    }
+    _scrollToBottom(); // Always scroll after execution
+  }
+
+  /// Prints the help message specific to this terminal.
+  void _printHelp() {
+    addOutput("--- FakePyTerminal Commands ---", color: theme.hintColor);
+    addOutput("help  : Display this help message.");
+    addOutput("clear : Clear the terminal screen.");
+    addOutput("exit  : Exits the terminal (stops app if root).");
+    addOutput("");
+    addOutput("--- Python Simulation (Basic) ---", color: theme.hintColor);
+    addOutput("Variables: `x = 10`, `name = \"Dart\"`");
+    addOutput("Print    : `print(\"Hello\")`, `print(x + 5)`");
+    addOutput("Operations: `x + y`, `a - b`, `p * q`, `s / t` (basic)");
+    addOutput("Functions: `len(\"hello\")`, `len(my_list)`");
+    addOutput("Functions: `random.randint(1, 10)`");
+    addOutput("");
+    if (_customCommands.isNotEmpty) {
+      addOutput("--- Custom Commands ---", color: theme.hintColor);
+      _customCommands.keys.forEach((cmd) {
+        addOutput("- $cmd", color: theme.hintColor);
+      });
+      addOutput("");
+    }
+    addOutput("Note: This is a highly simplified simulation. Complex Python features (loops, functions, classes, imports) are not fully supported.", color: theme.hintColor);
+  }
+
+  /// Scrolls the [ListView] to the bottom.
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+}
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Dart
+IGNORE_WHEN_COPYING_END
+
+d) lib/src/terminal_screen.dart
+
+// lib/src/terminal_screen.dart
+
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // We'll use provider for state management
+import 'package:alpha_fake_python_simulation/src/models.dart';
+import 'package:alpha_fake_python_simulation/src/terminal_controller.dart';
+
+/// A customizable Flutter widget that provides a fake terminal coding experience.
+class TerminalScreen extends StatefulWidget {
+  /// The controller for managing terminal state and logic.
+  final TerminalController controller;
+
+  /// Creates a [TerminalScreen] widget.
+  ///
+  /// A [TerminalController] must be provided to manage the terminal's state.
+  const TerminalScreen({
+    super.key,
+    required this.controller,
+  });
+
+  @override
+  State<TerminalScreen> createState() => _TerminalScreenState();
+}
+
+class _TerminalScreenState extends State<TerminalScreen> {
+  final TextEditingController _inputController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.init(); // Initialize the controller when the screen mounts
+  }
+
+  @override
+  void dispose() {
+    _inputController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Using ChangeNotifierProvider.value to use an externally provided controller
+    return ChangeNotifierProvider.value(
+      value: widget.controller,
+      child: Builder(
+        builder: (context) {
+          final terminalController = context.watch<TerminalController>();
+          final theme = terminalController.theme;
+
+          return Scaffold(
+            backgroundColor: theme.backgroundColor,
+            appBar: AppBar(
+              title: const Text('FakePyTerminal', style: TextStyle(color: Colors.white)),
+              centerTitle: true,
+              backgroundColor: theme.backgroundColor,
+              elevation: 0,
+            ),
+            body: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                children: <Widget>[
+                  // Terminal Output Area
+                  Expanded(
+                    child: ListView.builder(
+                      controller: terminalController.scrollController,
+                      itemCount: terminalController.history.length,
+                      itemBuilder: (context, index) {
+                        final line = terminalController.history[index];
+                        return SelectableText(
+                          line.text,
+                          style: TextStyle(color: line.color, fontSize: theme.defaultFontSize),
+                        );
+                      },
+                    ),
+                  ),
+                  // Separator line
+                  const Divider(color: Colors.white10, height: 20, thickness: 1),
+                  // Terminal Input Area
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: <Widget>[
+                      Text(
+                        '>>> ',
+                        style: TextStyle(color: theme.promptColor, fontSize: theme.promptFontSize),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: _inputController,
+                          onSubmitted: (value) async {
+                            await terminalController.executeCommand(value);
+                            _inputController.clear();
+                          },
+                          autofocus: true,
+                          keyboardType: TextInputType.text,
+                          textInputAction: TextInputAction.send,
+                          cursorColor: theme.promptColor,
+                          style: TextStyle(color: theme.defaultTextColor, fontSize: theme.promptFontSize),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none, // No border for the input field
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Dart
+IGNORE_WHEN_COPYING_END
+3. Main Package Export (lib/alpha_fake_python_simulation.dart)
+// lib/alpha_fake_python_simulation.dart
+
+/// A Flutter package for creating a fake Python terminal coding experience.
+library alpha_fake_python_simulation;
+
+export 'package:alpha_fake_python_simulation/src/terminal_screen.dart';
+export 'package:alpha_fake_python_simulation/src/terminal_controller.dart';
+export 'package:alpha_fake_python_simulation/src/models.dart' hide TerminalController; // Hide to avoid conflicts
+// Exclude internal components like fake_python_interpreter from public export
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Dart
+IGNORE_WHEN_COPYING_END
+4. Package Metadata (pubspec.yaml)
+
+You'll need to update pubspec.yaml in the alpha_fake_python_simulation directory:
+
+name: alpha_fake_python_simulation
+description: A Flutter package for creating a customizable fake Python terminal coding experience in a UI container.
+version: 0.1.0+1
+homepage: https://github.com/yourusername/alpha_fake_python_simulation # Replace with your repo
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.0.5 # For state management
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+# For styling, uncomment and provide a font if you have one.
+# flutter:
+#   assets:
+#     - assets/ # Example: font files in assets/fonts/
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Yaml
+IGNORE_WHEN_COPYING_END
+5. Example Project (example/)
+
+Modify example/lib/main.dart to demonstrate usage and custom commands.
+
+// example/lib/main.dart
+
+import 'package:flutter/material.dart';
+import 'package:alpha_fake_python_simulation/alpha_fake_python_simulation.dart'; // Import our package
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  // Initialize the TerminalController.
+  // We can pass custom theme settings and custom commands here.
+  late final TerminalController _terminalController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _terminalController = TerminalController(
+      theme: const TerminalTheme(
+        // Customizing the theme for this example
+        backgroundColor: Colors.deepPurple[900]!,
+        promptColor: Colors.amberAccent,
+        defaultTextColor: Colors.white70,
+        resultColor: Colors.lightBlueAccent,
+        errorColor: Colors.pinkAccent,
+        hintColor: Colors.greenAccent,
+        defaultFontSize: 15.0,
+        promptFontSize: 17.0,
+      ),
+      customCommands: {
+        'greet': _handleGreetCommand, // Register a custom 'greet' command
+        'whoami': _handleWhoAmICommand, // Register a custom 'whoami' command
+        'system_status': _handleSystemStatusCommand, // Programmatic check
+        'add': _handleAddCommand, // Example of taking arguments
+        'sleep': _handleSleepCommand, // Example of async command
+      },
+    );
+
+    // You can also add initial output programmatically:
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _terminalController.addOutput('System boot initiated...', color: Colors.lightBlueAccent);
+      _terminalController.addOutput('Loading modules...', color: Colors.lightBlueAccent);
+      _terminalController.addOutput('Access granted. Type \'help\' for available commands.', color: Colors.lightBlueAccent);
+    });
+  }
+
+  // --- Custom Command Handlers ---
+  // These functions define the logic for user-defined commands.
+  // They receive the full command, arguments, and the controller itself.
+
+  Future<void> _handleGreetCommand(String command, List<String> args, TerminalController controller) async {
+    if (args.isEmpty) {
+      controller.addOutput("Usage: greet <name>", color: controller.theme.errorColor);
+    } else {
+      final name = args.join(' ');
+      controller.addOutput("Hello, $name! Welcome to the alpha fake terminal.", color: controller.theme.hintColor);
+    }
+  }
+
+  Future<void> _handleWhoAmICommand(String command, List<String> args, TerminalController controller) async {
+    controller.addOutput("You are user: FlutterDev_99", color: controller.theme.hintColor);
+    controller.addOutput("Session ID: ${DateTime.now().microsecondsSinceEpoch}", color: controller.theme.hintColor);
+  }
+
+  Future<void> _handleSystemStatusCommand(String command, List<String> args, TerminalController controller) async {
+    controller.addOutput("Checking system status...", color: controller.theme.hintColor);
+    await Future.delayed(const Duration(seconds: 1)); // Simulate a delay
+
+    int cpuLoad = DateTime.now().second % 100; // Fake load
+    int memoryUsage = (DateTime.now().second % 70) + 20; // Fake usage
+    bool networkStatus = DateTime.now().second % 2 == 0;
+
+    controller.addOutput("CPU Load: ${cpuLoad}%", color: controller.theme.hintColor);
+    controller.addOutput("Memory Usage: ${memoryUsage}%", color: controller.theme.hintColor);
+    controller.addOutput("Network: ${networkStatus ? 'Online' : 'Offline'}", color: networkStatus ? Colors.green : controller.theme.errorColor);
+
+    // You can also directly interact with Python scope from custom commands
+    // e.g., controller.pythonScope['system_status_ok'] = networkStatus;
+  }
+
+  Future<void> _handleAddCommand(String command, List<String> args, TerminalController controller) async {
+    if (args.length != 2) {
+      controller.addOutput("Usage: add <number1> <number2>", color: controller.theme.errorColor);
+      return;
+    }
+    int? num1 = int.tryParse(args[0]);
+    int? num2 = int.tryParse(args[1]);
+
+    if (num1 == null || num2 == null) {
+      controller.addOutput("Error: Both arguments must be numbers.", color: controller.theme.errorColor);
+    } else {
+      controller.addOutput("Result: ${num1 + num2}", color: controller.theme.resultColor);
+    }
+  }
+
+  Future<void> _handleSleepCommand(String command, List<String> args, TerminalController controller) async {
+    if (args.length != 1) {
+      controller.addOutput("Usage: sleep <seconds>", controller.theme.errorColor);
+      return;
+    }
+    int? seconds = int.tryParse(args[0]);
+    if (seconds == null || seconds < 0) {
+      controller.addOutput("Error: <seconds> must be a positive integer.", controller.theme.errorColor);
+      return;
+    }
+    controller.addOutput("Sleeping for $seconds seconds...", controller.theme.hintColor);
+    await Future.delayed(Duration(seconds: seconds));
+    controller.addOutput("Awake now!", controller.theme.hintColor);
+  }
+
+  @override
+  void dispose() {
+    _terminalController.dispose(); // Important: Dispose the controller!
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'FakePyTerminal Demo',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        useMaterial3: true,
+      ),
+      home: Scaffold(
+        // Directly use the TerminalScreen widget
+        body: TerminalScreen(controller: _terminalController),
+      ),
+    );
+  }
+}
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Dart
+IGNORE_WHEN_COPYING_END
+6. Documentation (README.md, CHANGELOG.md)
+
+README.md
+
+# alpha_fake_python_simulation
+
+A Flutter package for creating a customizable, fake Python terminal coding experience within your UI.
+
+This package provides a UI widget that looks and feels like a command-line terminal, allowing users to type Python-like commands and see simulated output. It supports basic Python syntax like variable assignments, `print()` statements, simple arithmetic, `len()`, and `random.randint()`. Crucially, it allows you to define and integrate your own custom terminal commands.
+
+## Features
+
+*   **Terminal UI Widget**: Seamlessly embed a terminal interface in your Flutter app.
+*   **Customizable Theme**: Control colors (background, prompt, text, error, result), font sizes, and more.
+*   **Fake Python Interpreter**:
+    *   Basic variable assignment (`x = 10`, `name = "Alice"`).
+    *   `print()` statements with string, numeric, boolean, and basic variable/expression output.
+    *   Simple arithmetic operations (`+`, `-`, `*`, `/`).
+    *   `len()` for strings and (simulated) lists.
+    *   `random.randint(min, max)` for basic random numbers.
+    *   Basic type error and name error simulation.
+*   **User-defined Custom Commands**: Easily register your own terminal commands with custom logic.
+*   **Programmatic Control**: Add output or execute commands from your Flutter code using the `TerminalController`.
+*   **Auto-scrolling**: Keeps the latest output visible.
+
+## Installation
+
+Add this to your `pubspec.yaml` file:
+
+```yaml
+dependencies:
+  alpha_fake_python_simulation: ^0.1.0 # Or the latest version
+  provider: ^6.0.5 # This package uses Provider for state management, make sure it's also included.
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Markdown
+IGNORE_WHEN_COPYING_END
+
+Then run flutter pub get.
+
+Usage
+Basic Usage
+
+Import the package and add the TerminalScreen widget to your Scaffold's body:
+
+import 'package:flutter/material.dart';
+import 'package:alpha_fake_python_simulation/alpha_fake_python_simulation.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  // Create an instance of the TerminalController
+  late final TerminalController _terminalController;
+
+  @override
+  void initState() {
+    super.initState();
+    _terminalController = TerminalController(); // Use default theme and no custom commands
+  }
+
+  @override
+  void dispose() {
+    _terminalController.dispose(); // Important: Dispose the controller
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: const Text('My Fake Terminal')),
+        body: TerminalScreen(controller: _terminalController),
+      ),
+    );
+  }
+}
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Dart
+IGNORE_WHEN_COPYING_END
+Customizing the Terminal
+
+You can customize the appearance by passing a TerminalTheme object to the TerminalController constructor:
+
+_terminalController = TerminalController(
+  theme: const TerminalTheme(
+    backgroundColor: Colors.blueGrey[900]!,
+    promptColor: Colors.orangeAccent,
+    defaultTextColor: Colors.white,
+    resultColor: Colors.limeAccent,
+    errorColor: Colors.redAccent,
+    hintColor: Colors.lightBlue,
+    defaultFontSize: 16.0,
+    promptFontSize: 18.0,
+  ),
+);
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Dart
+IGNORE_WHEN_COPYING_END
+Adding Custom Commands
+
+Define your custom command handlers and pass them as a map to the customCommands parameter of TerminalController.
+
+A TerminalCommandHandler is a Future<void> Function(String command, List<String> args, TerminalController controller).
+
+command: The full string entered by the user (e.g., "mycmd arg1 arg2").
+
+args: A list of strings representing the arguments following the command name (e.g., ["arg1", "arg2"]).
+
+controller: The TerminalController instance, allowing you to use methods like controller.addOutput() or controller.pythonScope within your command logic.
+
+_terminalController = TerminalController(
+  customCommands: {
+    'hello': (cmd, args, controller) async {
+      final name = args.isNotEmpty ? args.join(' ') : 'World';
+      controller.addOutput('Hello, $name!', color: controller.theme.promptColor);
+    },
+    'calc': (cmd, args, controller) async {
+      if (args.length != 3 || (args[1] != '+' && args[1] != '-')) {
+        controller.addOutput('Usage: calc <num1> <+|-> <num2>', color: controller.theme.errorColor);
+        return;
+      }
+      int? num1 = int.tryParse(args[0]);
+      String operator = args[1];
+      int? num2 = int.tryParse(args[2]);
+
+      if (num1 == null || num2 == null) {
+        controller.addOutput('Error: Invalid numbers.', color: controller.theme.errorColor);
+        return;
+      }
+
+      int result;
+      if (operator == '+') {
+        result = num1 + num2;
+      } else {
+        result = num1 - num2;
+      }
+      controller.addOutput('Result: $result', color: controller.theme.resultColor);
+    },
+  },
+);
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Dart
+IGNORE_WHEN_COPYING_END
+Programmatic Output and Command Execution
+
+You can add output or execute commands from anywhere in your app where you have access to the TerminalController instance:
+
+// To add a line of output
+_terminalController.addOutput('A message from your app!', color: Colors.blue);
+
+// To programmatically execute a terminal command
+_terminalController.executeCommand('help');
+_terminalController.executeCommand('x = 100');
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+Dart
+IGNORE_WHEN_COPYING_END
+Supported Python-like Commands
+
+Variables: x = 10, name = "Alice", is_active = True, my_list = [1, 2]
+
+Print: print("hello"), print(x), print(x + y), print("Sum:", x + y)
+
+Arithmetic: x + y, a - b, p * q, s / t (float division, basic operations only, no precedence)
+
+Functions:
+
+len("hello") (for strings)
+
+len(my_list) (for assigned lists)
+
+random.randint(min, max) (basic integer random)
+
+Built-in Terminal Commands:
+
+help
+
+clear
+
+exit
+
+Limitations
+
+Not a Real Interpreter: This is a simulation. It does not run actual Python code or connect to a Python runtime.
+
+Simplified Parsing: Complex Python syntax (e.g., operator precedence in 2 + 3 * 4), multiple operations in one line, parentheses, loops, conditionals (if/else), functions (def), classes, imports (beyond random.randint) are NOT supported.
+
+Error Reporting: Simulated errors (e.g., TypeError, NameError, ZeroDivisionError) are generated by Dart logic, not Python's built-in exceptions.
+
+No Multi-line Input: Only single-line commands are supported.
+
+Feel free to contribute or suggest enhancements!
+
+License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+**`CHANGELOG.md`**
+
+```markdown
+# CHANGELOG
+
+## 0.1.0+1
+*   Initial release of `alpha_fake_python_simulation` package.
+*   Provides a customizable UI widget (`TerminalScreen`).
+*   Includes `TerminalController` for state management and programmatic interaction.
+*   Adds support for user-defined custom terminal commands.
+*   Implements a basic fake Python interpreter for assignments, `print()`, basic arithmetic, `len()`, and `random.randint()`.
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+IGNORE_WHEN_COPYING_END
+How to Test and Run This Package:
+
+Clone/Download: Create a Flutter project using flutter create my_app, then delete the lib folder.
+
+Copy Files:
+
+Copy the lib folder (containing alpha_fake_python_simulation.dart and the src folder) into the root of your my_app directory.
+
+Copy the example folder's contents into your my_app/lib folder, overwriting main.dart.
+
+Create pubspec.yaml, README.md, CHANGELOG.md as described above at the root of my_app if you haven't already. (Or, even better, place the package's files where a typical Flutter package's lib directory would be, and put the example code into a main.dart within a example subdirectory).
+
+The most straightforward way is to copy the code for the package components directly into a lib directory inside your Flutter app.
+
+Let's refine this to how you'd normally test:
+
+a. Create the package: flutter create --template=package alpha_fake_python_simulation
+b. Replace contents: Populate lib/src, lib/alpha_fake_python_simulation.dart, pubspec.yaml, README.md, CHANGELOG.md as detailed above.
+c. Go to example folder: cd alpha_fake_python_simulation/example
+d. Get dependencies: flutter pub get (This will get provider and implicitly your package).
+e. Run the example app: flutter run
+
+This will launch the example/lib/main.dart which uses your newly built package.
+
+Now you have a fully fledged Flutter package that provides a customizable fake terminal UI with user-extendable commands!
