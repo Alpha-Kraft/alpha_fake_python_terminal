@@ -1,0 +1,10 @@
+name: alpha_fake_python_terminal
+description: A fake Python terminal CLI application.
+version: 0.0.2
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+executables:
+  alpha_fake_python_terminal: alpha_fake_python_terminal
+dev_dependencies:
+  lints: ^3.0.0
+  test: ^1.24.0

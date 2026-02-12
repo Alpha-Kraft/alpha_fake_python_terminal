@@ -1,0 +1,12 @@
+# Dart
+.dart_tool/
+.packages
+.pub/
+build/
+pubspec.lock
+coverage/
+test-results/
+doc/api/
+.idea/
+.vscode/
+*.iml
